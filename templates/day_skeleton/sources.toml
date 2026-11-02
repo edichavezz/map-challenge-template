@@ -1,0 +1,13 @@
+# Where does the data come from? One [[source]] block per dataset.
+# Everything here shows on the day page. Empty fields show a red "missing" flag.
+
+[[source]]
+name = ""          # what it's called, e.g. "Street trees"
+url = ""           # link to the dataset's page (where someone could find it)
+from = ""          # who publishes it, e.g. "City of Chicago open data portal"
+what = ""          # a short description: what's in it, what one row/pixel is
+time = ""          # when it's from, e.g. "2015–2024, yearly" or "snapshot downloaded 2 Nov 2026"
+resolution = ""    # how detailed, e.g. "exact addresses", "by county", "30 m pixels"
+licence = ""       # e.g. "ODbL, © OpenStreetMap contributors", "Public domain", "CC BY 4.0"
+
+# Using a second dataset? Copy the whole block above (from [[source]] down).
