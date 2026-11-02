@@ -11,6 +11,7 @@ folium_style.py — make folium maps match the website.
     add_title(m, "Where the bakeries are")         # optional title box, top-left
     cafe, bakery = P.categorical(2)
     add_legend(m, "Type of shop", {"Café": cafe, "Bakery": bakery})
+    add_credit(m, OSM_DATA_CREDIT)                 # credit YOUR data, bottom-right corner
     m.save("map.html")
 
 These only change how the map LOOKS. Everything about your data — what goes on
@@ -21,6 +22,8 @@ import os
 from html import escape
 
 import folium
+from branca.element import MacroElement
+from jinja2 import Template
 
 from mapkit import palette as P
 
@@ -122,6 +125,34 @@ def add_legend(m, title, items, shape="circle"):
     )
     html = f'<div class="mk-box mk-legend"><b>{escape(title)}</b>{rows}</div>'
     m.get_root().html.add_child(folium.Element(html))
+    return m
+
+
+OSM_DATA_CREDIT = ('Data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
+                   'contributors')
+
+
+class _Credit(MacroElement):
+    _template = Template("""
+        {% macro script(this, kwargs) %}
+            {{ this._parent.get_name() }}.attributionControl.addAttribution({{ this.html|tojson }});
+        {% endmacro %}
+    """)
+
+    def __init__(self, html):
+        super().__init__()
+        self._name = "Credit"
+        self.html = html
+
+
+def add_credit(m, html):
+    """Credit your DATA in the map's bottom-right corner, next to the basemap's credit.
+
+    The basemap credits itself, but the data you draw on top needs its own credit
+    (most licences ask for it on the map, not just on the day page). html can
+    include a link, e.g. OSM_DATA_CREDIT for anything from OpenStreetMap.
+    """
+    _Credit(html).add_to(m)
     return m
 
 

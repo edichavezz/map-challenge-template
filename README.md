@@ -101,7 +101,7 @@ flags) say which of your six the website uses for those.
 `mapkit/folium_style.py` makes folium maps look like the site:
 
 ```python
-from mapkit.folium_style import add_basemap, style_map, add_title, add_legend
+from mapkit.folium_style import add_basemap, style_map, add_title, add_legend, add_credit, OSM_DATA_CREDIT
 
 m = folium.Map(location=[41.88, -87.63], zoom_start=12, tiles=None)
 add_basemap(m, "light")        # "light", "light-nolabels", "dark", "osm", "mapbox"
@@ -109,7 +109,12 @@ style_map(m)                   # site font, ink-outlined buttons, paper tooltips
 add_title(m, "Title", "subtitle")
 cafe, bakery = P.categorical(2)
 add_legend(m, "What the colours mean", {"Café": cafe, "Bakery": bakery})
+add_credit(m, OSM_DATA_CREDIT) # credit the data you drew, in the map's corner
 ```
+
+The basemap credits itself, but your data needs its own credit on the map (the
+full-screen link shows the map without the day page). For non-OSM data, pass your own
+text, e.g. `add_credit(m, "Trees: City of Chicago")`.
 
 The default basemaps (Esri Light/Dark Gray) need no account. Their detail stops around
 zoom 16; zoom in closer than that and the tiles get blurry.
@@ -173,3 +178,7 @@ This template was made by [Edita Chavez](https://editachavez.com/) for her own
 #30DayMapChallenge ([see hers](https://editachavez.com/projects/map-challenge-2026/)).
 Your site's footer says "Template by Edita Chavez"; that comes from the `[template]`
 part of `site.toml`. Please keep it, and enjoy the challenge!
+
+**Licence:** MIT (see `LICENSE`). Use it, change it and share it, for anything; just
+keep the copyright notice in `LICENSE`. The daily themes and prompts in `themes.toml`
+come from <https://30daymapchallenge.com/>.
