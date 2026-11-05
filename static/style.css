@@ -36,7 +36,8 @@ a { color: inherit; }
 .byline b a { text-decoration: none; background-image: linear-gradient(var(--highlight), var(--highlight)); background-size: 100% 4px; background-position: 0 92%; background-repeat: no-repeat; }
 .byline b a:hover { background-size: 100% 100%; }
 .byline p { margin: 6px 0 0; }
-.progress strong { color: var(--ink); }
+.template-invite a { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.how .template-invite { margin: 16px 0 0; color: var(--muted); }
 .chips { display: flex; gap: 6px; justify-content: flex-end; margin-top: 12px; }
 .chips i { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--ink); }
 
@@ -120,11 +121,47 @@ a { color: inherit; }
 }
 .daysub { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin: 22px 0 6px; font-size: 15px; color: var(--muted); }
 .daysub .title { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+/* the optional tag from a day's day.toml (e.g. how it was made) */
+.tag {
+  display: inline-block; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink);
+  padding: 1px 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; line-height: 1.4;
+}
+.tile .tag { position: absolute; top: 10px; right: 10px; font-size: 9.5px; padding: 0 5px; }
+.tile.is-today .tag { top: 34px; }   /* below the "Today" badge */
 .prompt { margin: 0 0 18px; max-width: 72ch; font-size: 14px; color: var(--muted); }
 
-.mapframe { margin: 0; border: 2px solid var(--ink); background: var(--water); }
+.mapframe { position: relative; margin: 0; border: 2px solid var(--ink); background: var(--water); }
+
+/* ← → arrows on the map's edges, to the previous / next finished day */
+.maparrow {
+  position: absolute; top: 50%; z-index: 1;
+  transform: translateY(-50%);
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 11px 8px;
+  background: var(--paper); color: var(--ink);
+  border: 2px solid var(--ink);
+  font-size: 15px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+  text-decoration: none;
+}
+.maparrow b { font-size: 24px; line-height: .8; }
+.maparrow.prev { left: 10px; }
+.maparrow.next { right: 10px; }
+.maparrow:hover, .maparrow:focus-visible { background: var(--day); color: var(--on-day); }
+.maparrow:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 .mapframe iframe { display: block; width: 100%; height: min(74vh, 700px); border: 0; }
 .mapframe img { display: block; width: 100%; height: auto; }
+/* extra pictures from a day's day.toml, under the map */
+.extra { margin: 28px 0 0; border: 2px solid var(--ink); background: var(--paper); }
+.extra img { display: block; width: 100%; height: auto; }
+.extra iframe { display: block; width: 100%; height: min(80vh, 760px); border: 0; }
+/* download buttons from a day's day.toml, under the map (and any extras) */
+.downloads { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin: 14px 0 0; }
+.download {
+  display: inline-block; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink);
+  padding: 6px 12px; font-size: 14px; font-weight: 700; text-decoration: none;
+}
+.download:hover, .download:focus-visible { background: var(--day, var(--ink)); color: var(--on-day, var(--paper)); }
+.extra figcaption { padding: 8px 12px; border-top: 1.5px solid var(--ink); font-size: 14px; color: var(--muted); }
 .maplinks { margin: 8px 0 0; text-align: right; font-size: 13px; font-weight: 700; }
 
 .label {
@@ -188,5 +225,9 @@ details.code pre {
   .srcgrid { grid-template-columns: 1fr; }
   .src dl { grid-template-columns: 88px 1fr; }
   .mapframe iframe { height: 68vh; }
+  .maparrow { padding: 6px 8px 7px; font-size: 13px; gap: 4px; }
+  .maparrow b { font-size: 20px; }
+  .maparrow.prev { left: 6px; }
+  .maparrow.next { right: 6px; }
   .pnext a, .pnext span { font-size: 17px; }
 }

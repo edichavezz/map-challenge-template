@@ -24,8 +24,6 @@
     <span>Made in Python by {% if s.made_by_url %}<a href="{{ s.made_by_url }}" target="_blank" rel="noopener">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}{% if s.made_with %} {{ s.made_with }}{% endif %}{% for link in s.links if link.url %} · <a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a>{% endfor %}</span>
     {% if s.template %}
     <span class="template-note">Template by {% if s.template.url %}<a href="{{ s.template.url }}" target="_blank" rel="noopener">{{ s.template.by }}</a>{% else %}{{ s.template.by }}{% endif %}{% if s.template.repo %} · <a href="{{ s.template.repo }}" target="_blank" rel="noopener">Make your own challenge site</a>{% endif %}</span>
-    {% elif s.template_repo %}
-    <span class="template-note">Doing the challenge too? <a href="{{ s.template_repo }}" target="_blank" rel="noopener">Use this template for your own →</a></span>
     {% endif %}
   </div>
 </footer>

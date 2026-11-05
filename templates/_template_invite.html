@@ -1,0 +1,4 @@
+{#- "Use this template" invite: shown under the intro on the calendar and in "How it was made"
+    on each day page. Only on the original site (template_repo in site.toml), never on copies:
+    copies credit the template in their footer instead ([template] in site.toml). -#}
+{% if s.template_repo and not s.template %}<p class="template-invite">Doing the challenge too? <a href="{{ s.template_repo }}" target="_blank" rel="noopener">Use this template for your own →</a></p>{% endif %}

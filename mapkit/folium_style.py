@@ -96,12 +96,14 @@ def add_basemap(m, style="light", mapbox_style="mapbox/light-v11"):
         if not token:
             raise RuntimeError("No MAPBOX_TOKEN found. See the README section 'Using Mapbox'.")
         url = f"https://api.mapbox.com/styles/v1/{mapbox_style}/tiles/256/{{z}}/{{x}}/{{y}}@2x?access_token={token}"
-        folium.TileLayer(tiles=url, attr=_MAPBOX_CREDIT, name="Mapbox", max_zoom=20).add_to(m)
+        # control=False: the basemap never gets an on/off switch in folium.LayerControl
+        folium.TileLayer(tiles=url, attr=_MAPBOX_CREDIT, name="Mapbox", max_zoom=20, control=False).add_to(m)
         return m
     if style not in BASEMAPS:
         raise ValueError(f"Unknown basemap {style!r}. Choose from: {', '.join(BASEMAPS)}, mapbox")
     base, labels, credit, sharpest = BASEMAPS[style]
-    folium.TileLayer(tiles=base, attr=credit, name=style, max_native_zoom=sharpest, max_zoom=19).add_to(m)
+    folium.TileLayer(tiles=base, attr=credit, name=style, max_native_zoom=sharpest, max_zoom=19,
+                     control=False).add_to(m)
     if labels:
         folium.TileLayer(tiles=labels, attr=credit, name=f"{style} labels", overlay=True,
                          control=False, max_native_zoom=sharpest, max_zoom=19).add_to(m)
@@ -153,6 +155,125 @@ def add_credit(m, html):
     include a link, e.g. OSM_DATA_CREDIT for anything from OpenStreetMap.
     """
     _Credit(html).add_to(m)
+    return m
+
+
+class _ConnectToExtras(MacroElement):
+    _template = Template("""
+        {% macro script(this, kwargs) %}
+        (function () {
+            const map = {{ this._parent.get_name() }};
+            const INK = {{ this.ink|tojson }};
+            const onDayPage = window.parent !== window;
+            const idOf = (p) => p && (p.osm_id || p.lake_osm_id);   // a lake, or the lake a swim spot is on
+            let marks = [];
+
+            // outline a shape (or ring a point) in ink, with its name above; optionally fly there
+            function mark(layer, latlng, name, fly) {
+                marks.forEach((l) => l.remove());
+                marks = [];
+                const style = {color: INK, weight: 3, fill: false, interactive: false};
+                let where;
+                if (layer && layer.getBounds) {
+                    marks.push(L.geoJSON(layer.feature, {style: style, interactive: false}).addTo(map));
+                    where = layer.getBounds().getCenter();
+                    if (fly) map.flyToBounds(layer.getBounds(), {maxZoom: 14, padding: [60, 60]});
+                } else {
+                    where = latlng || layer.getLatLng();
+                    marks.push(L.circleMarker(where, Object.assign({radius: 16}, style)).addTo(map));
+                    if (fly) map.flyTo(where, 13);
+                }
+                if (name) marks.push(L.tooltip({permanent: true, direction: "top", offset: [0, -14]})
+                                      .setLatLng(where).setContent(name).addTo(map));
+            }
+
+            // tell the extras under the map (via static/site.js) which lake was picked here
+            function tell(layer) {
+                const p = layer.feature.properties;
+                if (onDayPage && idOf(p)) window.parent.postMessage({type: "mk-select", osm_id: String(idOf(p)), name: p.name}, "*");
+            }
+
+            // 1. an extra asks: show this lake
+            window.addEventListener("message", (e) => {
+                const msg = e.data;
+                if (!msg || msg.type !== "mk-highlight") return;
+                let found = null;
+                if (msg.osm_id) map.eachLayer((l) => {
+                    const p = l.feature && l.feature.properties;
+                    if (!found && p && String(p.osm_id) === String(msg.osm_id) && l.getBounds) found = l;
+                });
+                mark(found, L.latLng(msg.lat, msg.lon), msg.name, true);
+            });
+
+            // 2. a click on a lake (or a swim spot on one) here: outline it and tell the extras
+            map.eachLayer((l) => {
+                const p = l.feature && l.feature.properties;
+                if (idOf(p)) l.on("click", () => { mark(l, null, p.name, false); tell(l); });
+            });
+
+            {% if this.search %}
+            // 3. a search box: every named shape, by "name · what it is"
+            const places = new Map();
+            map.eachLayer((l) => {
+                const p = l.feature && l.feature.properties;
+                if (!p || !p.name || p.name.startsWith("Unnamed")) return;
+                const label = p.kind ? `${p.name} · ${p.kind}${p.nation ? " · " + p.nation : ""}` : `${p.name} · swim spot`;
+                if (!places.has(label)) places.set(label, l);
+            });
+            const box = L.DomUtil.create("div", "mk-box mk-mapsearch", map.getContainer());
+            box.innerHTML = '<input list="mk-places" aria-label="Search">' + '<datalist id="mk-places"></datalist>';
+            const input = box.querySelector("input");
+            input.placeholder = {{ this.search|tojson }};
+            L.DomEvent.disableClickPropagation(box);
+            L.DomEvent.disableScrollPropagation(box);
+            input.addEventListener("focus", () => {
+                const list = box.querySelector("datalist");
+                if (list.children.length) return;
+                [...places.keys()].sort().forEach((label) => {
+                    const option = document.createElement("option");
+                    option.value = label;
+                    list.append(option);
+                });
+            });
+            input.addEventListener("change", () => {
+                const layer = places.get(input.value);
+                if (!layer) return;
+                mark(layer, null, layer.feature.properties.name, true);
+                tell(layer);
+                input.value = "";
+                input.blur();
+            });
+            const css = document.createElement("style");
+            css.textContent = ".mk-mapsearch { position: absolute; left: 12px; bottom: 30px; padding: 5px 6px; }" +
+                " .mk-mapsearch input { width: 280px; font: inherit; font-size: 14px; border: 0; outline: 0;" +
+                " background: transparent; color: " + INK + "; }" +
+                " @media (max-width: 640px) { .mk-mapsearch { right: 12px; } .mk-mapsearch input { width: 100%; }" +
+                " .mk-legend { bottom: 76px; } }";   // phones: lift the legend above the search box
+            document.head.append(css);
+            {% endif %}
+        })();
+        {% endmacro %}
+    """)
+
+    def __init__(self, search):
+        super().__init__()
+        self._name = "ConnectToExtras"
+        self.ink = P.INK
+        self.search = search
+
+
+def connect_to_extras(m, search=None):
+    """Connect this map with interactive extras under it on the day page (e.g. Day 3's lifted lakes).
+
+    - An extra can ask the map to show a place: it sends {type: "mk-highlight", osm_id, lat, lon, name},
+      and the map flies there and outlines the shape with that osm_id (or rings the point).
+    - Clicking a shape with an osm_id (or a lake_osm_id, for things on a lake) outlines it and sends
+      {type: "mk-select", osm_id, name}, so the extras can pick the same lake.
+    - search="Find a lake…" adds a search box (bottom left) for every named shape on the map.
+
+    static/site.js passes the messages between the frames on the day page.
+    """
+    _ConnectToExtras(search).add_to(m)
     return m
 
 

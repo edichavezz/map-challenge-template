@@ -7,8 +7,8 @@
     <div class="byline">
       <b>{% if s.made_by_url %}<a href="{{ s.made_by_url }}" target="_blank" rel="noopener">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}</b>
       <p>{{ s.intro }}</p>
-      <p class="progress"><strong>{{ done_count }}</strong> of 30 maps so far</p>
-      <div class="chips" aria-hidden="true">{% for c in categorical %}<i style="background: {{ c }}"></i>{% endfor %}</div>
+      {% include "_template_invite.html" %}
+      <!-- <div class="chips" aria-hidden="true">{% for c in categorical %}<i style="background: {{ c }}"></i>{% endfor %}</div> -->
     </div>
   </header>
 
@@ -23,6 +23,7 @@
            aria-label="Day {{ day.number }}, {{ day.theme }}{% if day.title %}: {{ day.title }}{% endif %}">
           {% if day.thumb %}<img class="thumb" src="days/{{ day.slug }}/{{ day.thumb }}" alt="" loading="lazy">{% else %}<span class="thumb no-thumb"></span>{% endif %}
           <span class="num">{{ day.number }}</span>
+          {% if day.tag %}<span class="tag">{{ day.tag }}</span>{% endif %}
           <span class="theme">{{ day.theme }}</span>
         </a>
       {% else %}

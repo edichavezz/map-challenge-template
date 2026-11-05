@@ -1,0 +1,14 @@
+# Optional settings for this day.
+# tag: a short label shown on the calendar square and the day page,
+# e.g. how the map was made ("Hand-coded" or "AI-coded"). Leave it empty for no label.
+tag = ""
+
+# More pictures to show under the map: one [[extra]] block per picture (a file in this folder).
+# [[extra]]
+# file = "extra.png"
+# caption = "What it shows"
+
+# Files people can download with a button under the map (also files in this folder).
+# [[download]]
+# file = "poster.png"
+# label = "Download the poster (PNG)"

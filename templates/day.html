@@ -23,6 +23,7 @@
   <div class="daysub">
     {% if day.title %}<span class="title">{{ day.title }}</span>{% endif %}
     <time datetime="{{ day.date.isoformat() }}">{{ day.date_label }}</time>
+    {% if day.tag %}<span class="tag">{{ day.tag }}</span>{% endif %}
   </div>
   {% if day.prompt %}<p class="prompt"><a href="{{ s.challenge_url }}" target="_blank" rel="noopener">#30DayMapChallenge prompt: </a> {{ day.prompt }}</p>{% endif %}
 
@@ -32,8 +33,28 @@
     {% else %}
       <iframe src="map.html" title="Interactive map: {{ day.title or day.theme }}" allowfullscreen></iframe>
     {% endif %}
+    {# Arrows on the map's edges to the previous / next finished day (only if there is one).
+       rel="prev"/"next" is also what the ← → keys in static/site.js look for. #}
+    {% if prev %}<a class="maparrow prev" rel="prev" href="../{{ prev.slug }}/index.html"
+       aria-label="Previous map: day {{ prev.number }}, {{ prev.theme }}" title="Day {{ prev.slug }} · {{ prev.theme }}"><b aria-hidden="true">←</b><span aria-hidden="true">{{ prev.slug }}</span></a>{% endif %}
+    {% if next %}<a class="maparrow next" rel="next" href="../{{ next.slug }}/index.html"
+       aria-label="Next map: day {{ next.number }}, {{ next.theme }}" title="Day {{ next.slug }} · {{ next.theme }}"><span aria-hidden="true">{{ next.slug }}</span><b aria-hidden="true">→</b></a>{% endif %}
   </figure>
   <p class="maplinks"><a href="{{ day.map_file.name }}" target="_blank" rel="noopener">⤢ Open the map full screen</a></p>
+  {% for extra in day.extras %}
+  <figure class="extra">
+    {% if extra.file.endswith(".html") %}
+    {# an interactive page: in a frame that only loads when you scroll to it #}
+    <iframe src="{{ extra.file }}" title="{{ extra.caption }}" loading="lazy" allowfullscreen></iframe>
+    {% else %}
+    <a href="{{ extra.file }}" target="_blank" rel="noopener"><img src="{{ extra.file }}" alt="{{ extra.caption }}" loading="lazy"></a>
+    {% endif %}
+    {% if extra.caption %}<figcaption>{{ extra.caption }}{% if extra.file.endswith(".html") %} · <a href="{{ extra.file }}" target="_blank" rel="noopener">⤢ full screen</a>{% endif %}</figcaption>{% endif %}
+  </figure>
+  {% endfor %}
+  {% if day.downloads %}
+  <p class="downloads">{% for d in day.downloads %}<a class="download" href="{{ d.file }}" download>⤓ {{ d.label or d.file }}</a>{% endfor %}</p>
+  {% endif %}
 
   <section class="why">
     <h2 class="label">Why this map</h2>
@@ -71,6 +92,7 @@
       <pre><code>{{ day.code }}</code></pre>
     </details>
     {% endif %}
+    {% include "_template_invite.html" %}
   </section>
 
   <nav class="pnext">

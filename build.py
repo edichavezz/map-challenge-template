@@ -15,6 +15,9 @@ Each day lives in a folder like days/01-points/ containing:
     notes.md      your reasoning. The first line "# ..." is the map's title.
     sources.toml  where the data comes from (one [[source]] block per dataset)
     thumb.png     optional: the preview image for the calendar square
+    day.toml      optional: tag = "Hand-coded" puts a label on the calendar square and day page;
+                  [[extra]] blocks (file = "lifted.png", caption = "...") add pictures under the map;
+                  [[download]] blocks (file = "...", label = "...") add download buttons
 
 A day appears as finished on the calendar as soon as its map file exists.
 """
@@ -85,6 +88,9 @@ class Day:
     tools: list = field(default_factory=list)
     code: str = ""
     thumb: str = ""                       # preview image file name, if any
+    tag: str = ""                         # short label from day.toml, e.g. "Hand-coded"
+    extras: list = field(default_factory=list)   # more pictures from day.toml: [{"file", "caption"}]
+    downloads: list = field(default_factory=list)   # download buttons from day.toml: [{"file", "label"}]
     warnings: list = field(default_factory=list)
 
     @property
@@ -168,6 +174,33 @@ def read_sources(folder, warnings):
     return sources
 
 
+def read_day_toml(folder, warnings):
+    """The optional day.toml: a label (tag = "...", e.g. how the map was made), extra
+    pictures shown under the map ([[extra]] file = "...", caption = "...") and files to
+    download with a button ([[download]] file = "...", label = "...")."""
+    path = folder / "day.toml"
+    if not path.exists():
+        return "", [], []
+    try:
+        data = load_toml(path)
+    except tomllib.TOMLDecodeError as err:
+        warnings.append(f"day.toml has a typo: {err}")
+        return "", [], []
+
+    def files(key, text_key, what):
+        found = []
+        for raw in data.get(key, []):
+            name = str(raw.get("file", "")).strip()
+            if not name or Path(name).name != name or not (folder / name).is_file():
+                warnings.append(f"day.toml: {what} {name!r} isn't a file in {folder.name}/")
+                continue
+            found.append({"file": name, text_key: str(raw.get(text_key, "")).strip()})
+        return found
+
+    return (str(data.get("tag", "")).strip(), files("extra", "caption", "extra picture"),
+            files("download", "label", "download"))
+
+
 def find_tools(code):
     """Which libraries does map.py import? (skips Python's built-in modules and mapkit)"""
     try:
@@ -210,6 +243,7 @@ def load_days(days_dir, settings):
             day.map_file = next((folder / f for f in MAP_FILES if (folder / f).exists()), None)
             day.title, day.notes_html = read_notes(folder)
             day.sources = read_sources(folder, day.warnings)
+            day.tag, day.extras, day.downloads = read_day_toml(folder, day.warnings)
             code_file = folder / "map.py"
             if code_file.exists():
                 code = code_file.read_text(encoding="utf-8")
@@ -272,6 +306,8 @@ def build(out_dir=SITE_DIR, days_dir=DAYS_DIR, make_thumbs=False, settings=None)
         target = out_dir / "days" / day.slug
         target.mkdir(parents=True)
         shutil.copy2(day.map_file, target / day.map_file.name)
+        for extra in day.extras + day.downloads:     # pictures and downloads listed in day.toml
+            shutil.copy2(day.folder / extra["file"], target / extra["file"])
         thumb = day.folder / "thumb.png"
         # With --thumbs, (re)make the preview whenever the map is newer than it.
         outdated = not thumb.exists() or thumb.stat().st_mtime < day.map_file.stat().st_mtime
@@ -293,7 +329,7 @@ def build(out_dir=SITE_DIR, days_dir=DAYS_DIR, make_thumbs=False, settings=None)
     grid = [[by_number.get(n) for n in week] for week in weeks]
     (out_dir / "index.html").write_text(
         env.get_template("index.html").render(
-            **common, root="", weeks=grid, done_count=len(done),
+            **common, root="", weeks=grid,
             weekdays=["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         ),
         encoding="utf-8",
@@ -325,8 +361,17 @@ def report(days, out_dir):
                 print(f"  ⚠ day {day.slug}: {warning}")
 
 
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    """Serves the site, telling the browser not to keep copies: after a rebuild, a normal reload
+    shows the new map.html / site.js instead of old ones from the browser's cache."""
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+
 def serve(out_dir, port=8000):
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(out_dir))
+    handler = functools.partial(NoCacheHandler, directory=str(out_dir))
     with http.server.ThreadingHTTPServer(("127.0.0.1", port), handler) as server:
         print(f"Serving at http://localhost:{port}  (Ctrl+C to stop)")
         try:

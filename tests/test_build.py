@@ -41,7 +41,7 @@ def test_calendar_has_all_30_days(tmp_path):
     index = (out / "index.html").read_text()
     assert index.count('class="tile done"') == 2
     assert index.count('class="tile empty"') == 28
-    assert "2</strong> of 30 maps" in index
+    assert "of 30 maps" not in index           # no progress count under the intro
 
 
 def test_only_finished_days_get_pages(tmp_path):
@@ -129,11 +129,17 @@ def footer_site(tmp_path, **changes):
 
 
 def test_original_site_invites_visitors_to_use_the_template(tmp_path):
-    pages = footer_site(tmp_path, template=None, template_repo="https://github.com/me/tpl")
-    for page in pages:
-        assert "Use this template for your own" in page
+    index, day = footer_site(tmp_path, template=None, template_repo="https://github.com/me/tpl")
+    invite = "Use this template for your own"
+    for page in (index, day):
+        assert page.count(invite) == 1
         assert 'href="https://github.com/me/tpl"' in page
         assert "Template by" not in page
+        assert invite not in page[page.index("<footer"):]           # not in the footer
+    byline = index[index.index('class="byline"'):index.index('class="calendar"')]
+    assert invite in byline                                         # under the intro
+    how = day[day.index('class="how"'):day.index('class="pnext"')]
+    assert invite in how                                            # in "How it was made"
 
 
 def test_copies_credit_the_template_author(tmp_path):
@@ -147,8 +153,8 @@ def test_copies_credit_the_template_author(tmp_path):
 
 
 def test_no_template_line_when_neither_is_set(tmp_path):
-    index, _ = footer_site(tmp_path, template=None, template_repo=None)
-    assert "template-note" not in index
+    for page in footer_site(tmp_path, template=None, template_repo=None):
+        assert "template-note" not in page and "template-invite" not in page
 
 
 def test_made_with_follows_the_name(tmp_path):
@@ -162,3 +168,100 @@ def test_prev_next_skip_unfinished_days(tmp_path):
     page = (out / "days/01/index.html").read_text()
     assert 'href="../03/index.html"' in page
     assert "../02/" not in page
+
+
+def test_map_arrows_go_to_neighbouring_finished_days(tmp_path):
+    out, _ = build_fixture(tmp_path)
+
+    def arrow(page, rel):
+        match = re.search(rf'<a class="maparrow {rel}" rel="{rel}" href="([^"]+)"', page)
+        return match and match.group(1)
+
+    first = (out / "days/01/index.html").read_text()
+    last = (out / "days/03/index.html").read_text()
+    assert arrow(first, "next") == "../03/index.html"      # skips unfinished day 02
+    assert 'rel="prev"' not in first                         # nothing before day 01
+    assert arrow(last, "prev") == "../01/index.html"
+    assert 'rel="next"' not in last                          # nothing after day 03
+
+
+def test_tag_from_day_toml_shows_on_calendar_and_day_page(tmp_path):
+    days = tmp_path / "days"
+    make_day(days, "01-points", {"map.html": "<html>a map</html>", "notes.md": "# One\n",
+                                 "day.toml": 'tag = "Hand-coded"\n'})
+    make_day(days, "02-lines", {"map.html": "<html>a map</html>", "notes.md": "# Two\n"})   # no day.toml
+    make_day(days, "03-polygons", {"map.html": "<html>a map</html>", "notes.md": "# Three\n",
+                                   "day.toml": 'tag = "AI-coded'})                        # typo: no closing quote
+    out = tmp_path / "site"
+    built = build.build(out_dir=out, days_dir=days)
+    index = (out / "index.html").read_text()
+    assert index.count('class="tag"') == 1
+    assert '<span class="tag">Hand-coded</span>' in index
+    assert '<span class="tag">Hand-coded</span>' in (out / "days/01/index.html").read_text()
+    assert 'class="tag"' not in (out / "days/02/index.html").read_text()
+    assert built[0].tag == "Hand-coded" and built[1].tag == ""
+    assert any("day.toml has a typo" in w for w in built[2].warnings)
+
+
+def test_extra_pictures_from_day_toml_go_under_the_map(tmp_path):
+    days = tmp_path / "days"
+    make_day(days, "01-points", {
+        "map.html": "<html>a map</html>", "notes.md": "# One\n", "lifted.png": TINY_PNG,
+        "day.toml": ('tag = "AI-coded"\n\n[[extra]]\nfile = "lifted.png"\ncaption = "Every lake, side by side"\n\n'
+                     '[[extra]]\nfile = "missing.png"\ncaption = "Not made yet"\n\n'
+                     '[[extra]]\nfile = "../02-lines/notes.md"\n'),
+    })
+    out = tmp_path / "site"
+    built = build.build(out_dir=out, days_dir=days)
+    page = (out / "days/01/index.html").read_text()
+    assert '<img src="lifted.png" alt="Every lake, side by side"' in page
+    assert "<figcaption>Every lake, side by side</figcaption>" in page
+    assert (out / "days/01/lifted.png").read_bytes() == TINY_PNG
+    assert page.count('<figure class="extra">') == 1               # only the picture that exists
+    assert 'src="missing.png"' not in page and 'src="../02-lines' not in page
+    assert any("missing.png" in w for w in built[0].warnings)
+    assert any("../02-lines/notes.md" in w for w in built[0].warnings)
+
+
+def test_extra_html_pages_go_in_a_frame(tmp_path):
+    days = tmp_path / "days"
+    make_day(days, "01-points", {
+        "map.html": "<html>a map</html>", "notes.md": "# One\n", "lifted.html": "<html>zoom me</html>",
+        "day.toml": '[[extra]]\nfile = "lifted.html"\ncaption = "Zoom in"\n'})
+    out = tmp_path / "site"
+    build.build(out_dir=out, days_dir=days)
+    page = (out / "days/01/index.html").read_text()
+    assert '<iframe src="lifted.html" title="Zoom in" loading="lazy"' in page
+    assert (out / "days/01/lifted.html").read_text() == "<html>zoom me</html>"
+
+
+def test_local_server_tells_the_browser_not_to_cache(tmp_path):
+    import functools, http.server, threading, urllib.request
+    (tmp_path / "index.html").write_text("hi")
+    handler = functools.partial(build.NoCacheHandler, directory=str(tmp_path))
+    handler.log_message = lambda *a, **k: None
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{server.server_port}/index.html") as r:
+            assert r.headers["Cache-Control"] == "no-store"
+            assert r.read() == b"hi"
+    finally:
+        server.shutdown()
+
+
+def test_downloads_from_day_toml_become_buttons(tmp_path):
+    days = tmp_path / "days"
+    make_day(days, "01-points", {
+        "map.html": "<html>a map</html>", "notes.md": "# One\n", "lifted.png": TINY_PNG,
+        "day.toml": ('[[download]]\nfile = "lifted.png"\nlabel = "Download the picture"\n\n'
+                     '[[download]]\nfile = "nope.png"\n')})
+    out = tmp_path / "site"
+    built = build.build(out_dir=out, days_dir=days)
+    page = (out / "days/01/index.html").read_text()
+    assert '<a class="download" href="lifted.png" download>' in page
+    assert "Download the picture" in page
+    assert '<img src="lifted.png"' not in page                     # a download, not shown on the page
+    assert (out / "days/01/lifted.png").read_bytes() == TINY_PNG
+    assert 'href="nope.png"' not in page
+    assert any("nope.png" in w for w in built[0].warnings)
